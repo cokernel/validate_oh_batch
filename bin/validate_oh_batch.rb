@@ -16,6 +16,7 @@ options = Trollop::options do
   opt :list_tests, "List available validation tests.  Don't actually run tests.", :default => false
   opt :report_passes, "Include passing tests in log.", :default => false
   opt :check_fixity, "Check fixity of master files.", :default => false
+  opt :list_restricted, "List restricted interviews.", :default => true
   # development only
   opt :ignore_filename_errors, "Ignore filename errors.", :default => false
 end

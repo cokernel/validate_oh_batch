@@ -51,6 +51,28 @@ module OhSip
         end
         validator = BatchValidator.new @options.merge(h)
         validator.run
+        if @options[:list_restricted]
+          puts
+          if File.directory?(File.join(h[:path], 'sips'))
+            puts "Restricted interviews:"
+            restricted = []
+            Dir.glob("#{h[:path]}/sips/*").sort.each do |sip|
+              path = File.join(sip, 'data', 'restricted.txt')
+              if File.exist?(path)
+                restricted << File.basename(sip)
+              end
+            end
+            if restricted.count > 0
+              restricted.each {|interview| puts "* #{interview}"}
+            else
+              puts "  (No restricted interviews found)"
+            end
+          else
+            # can't happen (we die before getting here if the
+            # directory doesn't exist)
+            puts "Batch is malformed, so not checking for restricted interviews."
+          end
+        end
       end
     end
 

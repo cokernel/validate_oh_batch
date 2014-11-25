@@ -1,3 +1,4 @@
+require 'bagit'
 require 'digest'
 require 'find'
 require 'pathname'
@@ -16,19 +17,69 @@ module OhSip
         :sip_exists,
         :sip_filenames_are_alphanumeric_plus_underscore,
         :sip_filenames_begin_with_the_interview_name,
+        :sip_has_bagit_layout,
         :sip_has_ohms_metadata_file,
         :sip_has_valid_ohms_metadata_file,
       ]
       if @path
-        @master = File.join @path, 'master'
+        @master = File.join @path, 'data', 'master'
       end
       if @options and @options[:check_fixity]
-        @tests << :sip_check_fixity
+        @tests << :sip_is_a_valid_bag
       end
     end
 
+    def sip_is_a_valid_bag
+      bag = BagIt::Bag.new @path
+      if bag.valid?
+        @logger.ok
+      else
+        @logger.fatal("SIP #{@path} is not a valid BagIt bag")
+      end
+    end
+
+    def sip_has_bagit_layout
+      unless File.exist?(File.join(@path, 'bagit.txt'))
+        @logger.fatal("SIP #{@path} is not a valid bag - bagit.txt is missing")
+        return
+      end
+
+      unless File.directory?(File.join(@path, 'data'))
+        @logger.fatal("SIP #{@path} is not a valid bag - data directory is missing")
+        return
+      end
+
+      stray_files = []
+      Dir.glob("#{@path}/*").each do |path|
+        file = File.basename path
+        unless file =~ /^bagit.txt$/ or file =~ /^bag-info.txt$/ or file =~ /^(tag)?manifest-(\w+).txt$/ or file =~ /^data/
+          stray_files << file
+        end
+      end
+
+      if stray_files.count > 0
+        @logger.fatal("SIP #{@path} is not a valid bag - bag directory includes files that should be in a data directory: #{stray_files.join(', ')}")
+        return
+      end
+
+      manifest_files = []
+      Dir.glob("#{@path}/*").each do |path|
+        file = File.basename path
+        if file =~ /^manifest-(\w+).txt$/
+          manifest_files << file
+        end
+      end
+
+      unless manifest_files.count > 0
+        @logger.fatal("SIP #{@path} is not a valid bag - no manifest-***.xml file found")
+        return
+      end
+
+      @logger.ok
+    end
+
     def ohms_filename
-      File.join(@path, "#{@base}_ohm.xml")
+      File.join(@path, "data", "#{@base}_ohm.xml")
     end
 
     def sip_has_valid_ohms_metadata_file
@@ -44,60 +95,6 @@ module OhSip
       else
         @logger.fatal("SIP #{@base}: missing OHMS metadata file, expected in #{ohms_filename}")
         @live = false
-      end
-    end
-
-    def checksum_file_for(file)
-      ext = File.extname(file)
-      dir = File.dirname(file)
-      base = File.basename(file, ext)
-      File.join dir, "#{base}_fix.md5"
-    end
-
-    def sip_check_fixity
-      valid = true
-      if File.directory?(@master)
-        Find.find(@master) do |file|
-          if File.file?(file) and (File.extname(file) != '.md5')
-            basename = File.basename(file)
-            relative = Pathname.new(file).
-                       relative_path_from(Pathname.new @path)
-            # move this elsewhere
-            chk = checksum_file_for(file)
-            if File.file?(chk)
-              found = false
-              chksum_expected = 0
-              chksum_actual = 1
-              File.foreach(chk).each do |line|
-                line.chomp!
-                if line =~ /^([0-9a-f]{32})\s*-\s*#{basename}/
-                  found = true
-                  chksum_expected = $1
-                  md5 = Digest::MD5.file file
-                  chksum_actual = md5.hexdigest
-                end
-              end
-              if found
-                if chksum_actual == chksum_expected
-                  @logger.ok
-                else
-                  @logger.warn("SIP #{@base}: wrong checksum for master file #{relative} - expected #{chksum_expected}, got #{chksum_actual}")
-                end
-              else
-                @logger.warn("SIP #{@base}: can't find checksum for master file #{relative}")
-                valid = false
-              end
-            else
-              @logger.warn("SIP #{@base}: master file #{relative} is missing a checksum file")
-              valid = false
-            end
-          end
-        end
-      end
-      if valid
-        @logger.ok
-      else
-        @logger.warn("SIP #{@base} includes master files with invalid checksums")
       end
     end
 
@@ -136,16 +133,21 @@ module OhSip
         return
       end
       valid = true
-      Find.find(@path) do |subpath|
-        if File.file?(subpath)
-          filename = File.basename(subpath)
-          unless begins_with_the_interview_name?(filename)
-            relative = Pathname.new(subpath).
-                       relative_path_from(Pathname.new @path)
-            @logger.warn("SIP #{@base}: filename #{relative} has incorrect prefix, should be #{@base}")
-            valid = false
+      if File.directory?(File.join(@path, 'data'))
+        Find.find(File.join(@path, 'data')) do |subpath|
+          if File.file?(subpath)
+            filename = File.basename(subpath)
+            unless begins_with_the_interview_name?(filename)
+              relative = Pathname.new(subpath).
+                        relative_path_from(Pathname.new @path)
+              @logger.warn("SIP #{@base}: filename #{relative} has incorrect prefix, should be #{@base}")
+              valid = false
+            end
           end
         end
+      else
+        @logger.fatal("SIP #{@base} has no data directory")
+        return
       end
       if valid
         @logger.ok
@@ -160,12 +162,17 @@ module OhSip
         return
       end
       valid = true
-      Find.find(@path) do |subpath|
-        filename = File.basename(subpath)
-        unless is_valid_format?(filename)
-          @logger.warn("SIP #{@base}: filename #{subpath} has invalid characters")
-          valid = false
+      if File.directory?(File.join(@path, 'data'))
+        Find.find(File.join(@path, 'data')) do |subpath|
+          filename = File.basename(subpath)
+          unless is_valid_format?(filename)
+            @logger.warn("SIP #{@base}: filename #{subpath} has invalid characters")
+            valid = false
+          end
         end
+      else
+        @logger.fatal("SIP #{@base} has no data directory")
+        return
       end
       if valid
         @logger.ok
