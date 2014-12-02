@@ -1,3 +1,11 @@
+PATH
+  remote: .
+  specs:
+    validate_oh_batch (0.0.1)
+      bagit (~> 0.3)
+      nokogiri (~> 1.6)
+      trollop (~> 2)
+
 GEM
   remote: https://rubygems.org/
   specs:
@@ -8,6 +16,7 @@ GEM
     mini_portile (0.6.1)
     nokogiri (1.6.4.1)
       mini_portile (~> 0.6.0)
+    rake (10.3.2)
     trollop (2.0)
     validatable (1.6.7)
 
@@ -15,6 +24,6 @@ PLATFORMS
   ruby
 
 DEPENDENCIES
-  bagit
-  nokogiri
-  trollop
+  bundler (~> 1.7)
+  rake (~> 10.0)
+  validate_oh_batch!
