@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    validate_oh_batch (0.0.1)
+    validate_oh_batch (0.0.2)
       bagit (~> 0.3)
       nokogiri (~> 1.6)
       trollop (~> 2)

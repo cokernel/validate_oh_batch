@@ -53,11 +53,11 @@ module OhSip
         validator.run
         if @options[:list_restricted]
           puts
-          if File.directory?(File.join(h[:path], 'sips'))
+          if File.directory?(File.join(h[:path], 'data', 'sips'))
             puts "Restricted interviews:"
             restricted = []
-            Dir.glob("#{h[:path]}/sips/*").sort.each do |sip|
-              path = File.join(sip, 'data', 'restricted.txt')
+            Dir.glob("#{h[:path]}/data/sips/*").sort.each do |sip|
+              path = File.join(sip, 'restricted.txt')
               if File.exist?(path)
                 restricted << File.basename(sip)
               end

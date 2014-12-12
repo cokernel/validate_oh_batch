@@ -8,7 +8,7 @@ module OhSip
     def initialize options = nil
       set_default_options(options)
       if options
-        @sips_dir = File.join(@path, 'sips')
+        @sips_dir = File.join(@path, 'data', 'sips')
         if @options[:sips_dir]
           @alt_sips_dir = File.join(@path, @options[:sips_dir])
         end
@@ -16,8 +16,61 @@ module OhSip
       end
       @tests = [
         :batch_exists,
+        :batch_has_bagit_layout,
         :batch_has_sips_directory,
       ]
+      if options and options[:check_fixity]
+        @tests << :batch_is_a_valid_bag
+      end
+    end
+
+    def batch_is_a_valid_bag
+      bag = BagIt::Bag.new @path
+      if bag.valid?
+        @logger.ok
+      else
+        @logger.fatal("Batch #{@path} is not a valid BagIt bag")
+      end
+    end
+
+    def batch_has_bagit_layout
+      unless File.exist?(File.join(@path, 'bagit.txt'))
+        @logger.fatal("Batch #{@path} is not a valid bag - bagit.txt is missing")
+        return
+      end
+
+      unless File.directory?(File.join(@path, 'data'))
+        @logger.fatal("Batch #{@path} is not a valid bag - data directory is missing")
+        return
+      end
+
+      stray_files = []
+      Dir.glob("#{@path}/*").each do |path|
+        file = File.basename path
+        unless file =~ /^bagit.txt$/ or file =~ /^bag-info.txt$/ or file =~ /^(tag)?manifest-(\w+).txt$/ or file =~ /^data/
+          stray_files << file
+        end
+      end
+
+      if stray_files.count > 0
+        @logger.fatal("Batch #{@path} is not a valid bag - bag directory includes files that should be in a data directory: #{stray_files.join(', ')}")
+        return
+      end
+
+      manifest_files = []
+      Dir.glob("#{@path}/*").each do |path|
+        file = File.basename path
+        if file =~ /^manifest-(\w+).txt$/
+          manifest_files << file
+        end
+      end
+
+      unless manifest_files.count > 0
+        @logger.fatal("Batch #{@path} is not a valid bag - no manifest-***.xml file found")
+        return
+      end
+
+      @logger.ok
     end
 
     def descend
