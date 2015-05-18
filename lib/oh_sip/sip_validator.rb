@@ -83,9 +83,10 @@ module OhSip
       Find.find(@path) do |subpath|
         if File.file?(subpath)
           filename = File.basename(subpath)
+          relative = Pathname.new(subpath).
+                    relative_path_from(Pathname.new @path)
+          next if relative.to_s =~ /^preserve\//
           unless begins_with_the_interview_name?(filename)
-            relative = Pathname.new(subpath).
-                      relative_path_from(Pathname.new @path)
             @logger.warn("SIP #{@base}: filename #{relative} has incorrect prefix, should be #{@base}")
             valid = false
           end
@@ -106,6 +107,9 @@ module OhSip
       valid = true
       Find.find(@path) do |subpath|
         filename = File.basename(subpath)
+        relative = Pathname.new(subpath).
+                  relative_path_from(Pathname.new @path)
+        next if relative.to_s =~ /^preserve\//
         unless is_valid_format?(filename)
           @logger.warn("SIP #{@base}: filename #{subpath} has invalid characters")
           valid = false
